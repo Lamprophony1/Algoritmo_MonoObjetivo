@@ -1,7 +1,3 @@
-main.py
-+45
--45
-
 """Punto de entrada principal para la optimización de polinomios mediante un algoritmo genético."""
 
 import random
