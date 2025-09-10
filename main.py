@@ -3,6 +3,8 @@
 import random
 from typing import List, Tuple
 
+import numpy as np
+
 # La librería matplotlib se utiliza para graficar la convergencia. Se intenta
 # importar, pero si no está disponible el programa continúa sin generar el
 # gráfico para facilitar la ejecución en entornos limitados.
@@ -90,6 +92,31 @@ def mutate(bitstring: str, rate: float = 0.01) -> str:
     return "".join(new_bits)
 
 
+def find_all_extrema(
+    coefficients: List[float],
+    lower: float,
+    upper: float,
+    optimize_max: bool,
+) -> List[Tuple[float, float]]:
+    """Calcula todos los extremos locales del polinomio en el intervalo dado."""
+
+    poly = np.poly1d(list(reversed(coefficients)))
+    d1 = poly.deriv()
+    d2 = d1.deriv()
+    extrema: List[Tuple[float, float]] = []
+    for root in d1.r:
+        if abs(root.imag) < 1e-8:
+            x = root.real
+            if lower <= x <= upper:
+                second = d2(x)
+                fx = poly(x)
+                if optimize_max and second < 0:
+                    extrema.append((x, fx))
+                elif not optimize_max and second > 0:
+                    extrema.append((x, fx))
+    return sorted(extrema, key=lambda t: t[0])
+
+
 def genetic_algorithm(
     coefficients: List[float],
     lower: float,
@@ -98,13 +125,14 @@ def genetic_algorithm(
     bits: int,
     pop_size: int,
     generations: int,
-) -> Tuple[List[float], Tuple[str, float, float], List[float]]:
-    """Ejecuta el algoritmo genético y devuelve la población, el mejor individuo y el historial.
+) -> Tuple[List[float], List[float], Tuple[str, float, float], List[float]]:
+    """Ejecuta el algoritmo genético y devuelve la población final y los extremos.
 
     Devuelve una tupla que contiene:
-    - lista de valores de x decodificados de la población final
-    - una tupla con (mejor_cromosoma, mejor_x, mejor_fx)
-    - historial del mejor valor de la función por generación para graficar
+    - lista de valores de x decodificados de la población final,
+    - lista de valores de F(x) correspondientes,
+    - una tupla con (mejor_cromosoma, mejor_x, mejor_fx),
+    - historial del mejor valor de la función por generación para graficar.
     """
     population = initial_population(pop_size, bits)
     # Inicializa la mejor solución con el primer individuo
@@ -142,7 +170,8 @@ def genetic_algorithm(
         population = next_generation[:pop_size]
 
     final_decoded = [decode(ch, lower, upper, bits) for ch in population]
-    return final_decoded, (best_chromosome, best_x, best_fx), history
+    final_values = [polynomial_value(x, coefficients) for x in final_decoded]
+    return final_decoded, final_values, (best_chromosome, best_x, best_fx), history
 
 
 def main() -> None:
@@ -169,7 +198,7 @@ def main() -> None:
     generations = int(input("Número máximo de generaciones: "))
 
     # Ejecuta el algoritmo genético con los parámetros proporcionados
-    final_pop, best, history = genetic_algorithm(
+    final_pop, final_vals, best, history = genetic_algorithm(
         coefficients, lower, upper, optimize_max, bits, pop_size, generations
     )
 
@@ -178,6 +207,11 @@ def main() -> None:
     print("\nPoblación final (valores de x):")
     for val in final_pop:
         print(f"{val:.6f}")
+
+    print("\nExtremos locales detectados:")
+    extrema = find_all_extrema(coefficients, lower, upper, optimize_max)
+    for x, fx in extrema:
+        print(f"x = {x:.6f}, F(x) = {fx:.6f}")
 
     print("\nMejor cromosoma:", best_chromosome)
     print(f"Mejor x = {best_x:.6f}")
