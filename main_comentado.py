@@ -12,10 +12,6 @@ import random
 # 'typing' nos permite aclarar los tipos de datos que usa cada función.
 from typing import List, Tuple
 
-# 'numpy' ofrece utilidades matemáticas. Aquí lo usamos para derivar el polinomio
-# y encontrar sus extremos mediante cálculo.
-import numpy as np
-
 # 'matplotlib' es opcional y solo se utiliza para dibujar un gráfico de convergencia.
 # Si no está instalada, el programa sigue funcionando sin el gráfico.
 try:  # pragma: no cover - solo se ejecuta si la librería no está
@@ -119,30 +115,6 @@ def mutar_cromosoma(cadena_bits: str, probabilidad_mutacion: float = 0.01) -> st
     ]
     return "".join(nuevos_bits)
 
-
-def encontrar_extremos(
-    coeficientes: List[float],
-    limite_inferior: float,
-    limite_superior: float,
-    optimizar_max: bool,
-) -> List[Tuple[float, float]]:
-    """Busca los puntos donde el polinomio tiene máximos o mínimos locales."""
-
-    polinomio = np.poly1d(list(reversed(coeficientes)))
-    primera_derivada = polinomio.deriv()
-    segunda_derivada = primera_derivada.deriv()
-    lista_extremos: List[Tuple[float, float]] = []
-    for raiz in primera_derivada.r:  # Analizamos las raíces de la primera derivada
-        if abs(raiz.imag) < 1e-8:  # Descartamos raíces complejas
-            valor_x = raiz.real
-            if limite_inferior <= valor_x <= limite_superior:
-                segunda_eval = segunda_derivada(valor_x)
-                valor_fx = polinomio(valor_x)
-                if optimizar_max and segunda_eval < 0:
-                    lista_extremos.append((valor_x, valor_fx))
-                elif not optimizar_max and segunda_eval > 0:
-                    lista_extremos.append((valor_x, valor_fx))
-    return sorted(lista_extremos, key=lambda t: t[0])
 
 
 # ------ ALGORITMO GENÉTICO COMPLETO ------
@@ -270,14 +242,6 @@ def programa_principal() -> None:
     print("\nPoblación final (valores de x):")
     for valor in poblacion_final:
         print(f"{valor:.6f}")
-
-    # Listamos extremos locales calculados analíticamente
-    print("\nExtremos locales detectados:")
-    extremos = encontrar_extremos(
-        coeficientes, limite_inferior, limite_superior, optimizar_max
-    )
-    for valor_x, valor_fx in extremos:
-        print(f"x = {valor_x:.6f}, F(x) = {valor_fx:.6f}")
 
     # Resaltamos el mejor individuo encontrado por el algoritmo
     print("\nMejor cromosoma:", mejor_cromosoma)
