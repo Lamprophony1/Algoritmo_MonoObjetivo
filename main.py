@@ -1,225 +1,248 @@
-"""Punto de entrada principal para la optimización de polinomios mediante un algoritmo genético."""
+"""Programa para optimizar polinomios mediante un algoritmo genético."""
 
 import random
 from typing import List, Tuple
 
 import numpy as np
 
-# La librería matplotlib se utiliza para graficar la convergencia. Se intenta
-# importar, pero si no está disponible el programa continúa sin generar el
-# gráfico para facilitar la ejecución en entornos limitados.
-try:
+# La librería matplotlib se utiliza solo para el gráfico de convergencia.  Si no
+# está instalada, el programa continúa funcionando sin generar dicho gráfico.
+try:  # pragma: no cover - solo se ejecuta si falta la librería
     import matplotlib.pyplot as plt
-except Exception:  # pragma: no cover - solo se ejecuta si falta la librería
+except Exception:  # pragma: no cover - manejamos cualquier problema de importación
     plt = None
 
 
-def polynomial_value(x: float, coefficients: List[float]) -> float:
-    """Devuelve F(x) para un polinomio definido por sus coeficientes.
+def evaluar_polinomio(valor_x: float, coeficientes: List[float]) -> float:
+    """Devuelve el valor F(x) de un polinomio para un valor de ``x``.
 
-    coefficients[i] corresponde al coeficiente a_i de x**i.
-    El polinomio se evalúa utilizando una suma simple.
+    ``coeficientes[i]`` es el coeficiente :math:`a_i` del término ``x**i``.
     """
-    # Itera sobre la lista de coeficientes generando a * x**i para cada término
-    return sum(coef * (x ** i) for i, coef in enumerate(coefficients))
+
+    return sum(
+        coeficiente * (valor_x ** potencia)
+        for potencia, coeficiente in enumerate(coeficientes)
+    )
 
 
-def decode(bitstring: str, lower: float, upper: float, bits: int) -> float:
-    """Traduce un cromosoma binario a un valor real de x dentro de [lower, upper]."""
-    # Mayor entero representable con el número de bits dado
-    max_int = 2 ** bits - 1
-    # Convierte el cromosoma de base 2 a un entero
-    integer_value = int(bitstring, 2)
-    # Escala el entero al intervalo deseado [lower, upper]
-    return lower + (integer_value / max_int) * (upper - lower)
+def decodificar_cromosoma(
+    cadena_bits: str, limite_inferior: float, limite_superior: float, cantidad_bits: int
+) -> float:
+    """Convierte un cromosoma binario en un valor real dentro del intervalo dado."""
+
+    maximo_entero = 2 ** cantidad_bits - 1
+    valor_entero = int(cadena_bits, 2)
+    return limite_inferior + (valor_entero / maximo_entero) * (
+        limite_superior - limite_inferior
+    )
 
 
-def encode(x: float, lower: float, upper: float, bits: int) -> str:
-    """Convierte un valor real x en su representación binaria de cromosoma."""
-    max_int = 2 ** bits - 1
-    # Normaliza x a un valor entre 0 y 1 y escala al rango entero
-    scaled = int(round((x - lower) / (upper - lower) * max_int))
-    # Formatea el entero como una cadena binaria rellenada con ceros a la izquierda
-    return format(scaled, f"0{bits}b")
+def codificar_valor(
+    valor_x: float, limite_inferior: float, limite_superior: float, cantidad_bits: int
+) -> str:
+    """Convierte un valor real ``x`` a su representación binaria."""
+
+    maximo_entero = 2 ** cantidad_bits - 1
+    valor_escalado = int(
+        round((valor_x - limite_inferior) / (limite_superior - limite_inferior) * maximo_entero)
+    )
+    return format(valor_escalado, f"0{cantidad_bits}b")
 
 
-def initial_population(pop_size: int, bits: int) -> List[str]:
-    """Crea la población inicial aleatoria de cromosomas binarios."""
-    # Cada cromosoma es una cadena de bits escogidos aleatoriamente
-    return ["".join(random.choice("01") for _ in range(bits)) for _ in range(pop_size)]
+def generar_poblacion_inicial(tamano_poblacion: int, cantidad_bits: int) -> List[str]:
+    """Crea la población inicial de cromosomas binarios."""
 
-
-def fitness_values(values: List[float], optimize_max: bool) -> List[float]:
-    """Calcula los valores de aptitud a partir de los valores de la función según el tipo de optimización."""
-    # La aptitud debe ser positiva. Desplazamos los valores para que el peor tenga baja aptitud.
-    if optimize_max:
-        min_val = min(values)
-        # Valores de la función más altos => mayor aptitud
-        return [v - min_val + 1e-6 for v in values]  # un pequeño epsilon evita aptitud cero
-    else:
-        max_val = max(values)
-        # Valores de la función más bajos => mayor aptitud para minimización
-        return [max_val - v + 1e-6 for v in values]
-
-
-def select(population: List[str], fitness: List[float]) -> Tuple[str, str]:
-    """Selecciona dos padres utilizando selección por ruleta."""
-    # random.choices realiza la selección proporcionalmente a los pesos proporcionados
-    return tuple(random.choices(population, weights=fitness, k=2))
-
-
-def crossover(parent1: str, parent2: str, rate: float = 0.7) -> Tuple[str, str]:
-    """Realiza cruza de un punto entre dos padres."""
-    # Con la tasa de cruza, intercambia las colas de los padres después de un punto aleatorio
-    if random.random() < rate:
-        point = random.randint(1, len(parent1) - 1)
-        child1 = parent1[:point] + parent2[point:]
-        child2 = parent2[:point] + parent1[point:]
-        return child1, child2
-    # Si no ocurre cruza, los descendientes son copias exactas de los padres
-    return parent1, parent2
-
-
-def mutate(bitstring: str, rate: float = 0.01) -> str:
-    """Invierte bits en el cromosoma con la probabilidad de mutación dada."""
-    # Itera por cada bit y posiblemente lo invierte
-    new_bits = [
-        "1" if (bit == "0" and random.random() < rate) else
-        "0" if (bit == "1" and random.random() < rate) else
-        bit
-        for bit in bitstring
+    return [
+        "".join(random.choice("01") for _ in range(cantidad_bits))
+        for _ in range(tamano_poblacion)
     ]
-    return "".join(new_bits)
 
 
-def find_all_extrema(
-    coefficients: List[float],
-    lower: float,
-    upper: float,
-    optimize_max: bool,
+def calcular_aptitudes(valores_funcion: List[float], optimizar_max: bool) -> List[float]:
+    """Calcula la aptitud de cada individuo según los valores de ``F(x)``."""
+
+    if optimizar_max:
+        valor_minimo = min(valores_funcion)
+        return [v - valor_minimo + 1e-6 for v in valores_funcion]
+    valor_maximo = max(valores_funcion)
+    return [valor_maximo - v + 1e-6 for v in valores_funcion]
+
+
+def seleccionar_padres(poblacion: List[str], aptitudes: List[float]) -> Tuple[str, str]:
+    """Elige dos padres mediante selección por ruleta."""
+
+    return tuple(random.choices(poblacion, weights=aptitudes, k=2))
+
+
+def cruzar_cromosomas(
+    padre1: str, padre2: str, probabilidad_cruza: float = 0.7
+) -> Tuple[str, str]:
+    """Realiza una cruza de un punto entre dos padres."""
+
+    if random.random() < probabilidad_cruza:
+        punto_cruza = random.randint(1, len(padre1) - 1)
+        hijo1 = padre1[:punto_cruza] + padre2[punto_cruza:]
+        hijo2 = padre2[:punto_cruza] + padre1[punto_cruza:]
+        return hijo1, hijo2
+    return padre1, padre2
+
+
+def mutar_cromosoma(cadena_bits: str, probabilidad_mutacion: float = 0.01) -> str:
+    """Invierte bits del cromosoma con la probabilidad indicada."""
+
+    nuevos_bits = [
+        "1" if (bit == "0" and random.random() < probabilidad_mutacion) else
+        "0" if (bit == "1" and random.random() < probabilidad_mutacion) else
+        bit
+        for bit in cadena_bits
+    ]
+    return "".join(nuevos_bits)
+
+
+def encontrar_extremos(
+    coeficientes: List[float],
+    limite_inferior: float,
+    limite_superior: float,
+    optimizar_max: bool,
 ) -> List[Tuple[float, float]]:
-    """Calcula todos los extremos locales del polinomio en el intervalo dado."""
+    """Calcula los extremos locales del polinomio en el intervalo indicado."""
 
-    poly = np.poly1d(list(reversed(coefficients)))
-    d1 = poly.deriv()
-    d2 = d1.deriv()
-    extrema: List[Tuple[float, float]] = []
-    for root in d1.r:
-        if abs(root.imag) < 1e-8:
-            x = root.real
-            if lower <= x <= upper:
-                second = d2(x)
-                fx = poly(x)
-                if optimize_max and second < 0:
-                    extrema.append((x, fx))
-                elif not optimize_max and second > 0:
-                    extrema.append((x, fx))
-    return sorted(extrema, key=lambda t: t[0])
+    polinomio = np.poly1d(list(reversed(coeficientes)))
+    primera_derivada = polinomio.deriv()
+    segunda_derivada = primera_derivada.deriv()
+    lista_extremos: List[Tuple[float, float]] = []
+    for raiz in primera_derivada.r:
+        if abs(raiz.imag) < 1e-8:
+            valor_x = raiz.real
+            if limite_inferior <= valor_x <= limite_superior:
+                segunda_eval = segunda_derivada(valor_x)
+                valor_fx = polinomio(valor_x)
+                if optimizar_max and segunda_eval < 0:
+                    lista_extremos.append((valor_x, valor_fx))
+                elif not optimizar_max and segunda_eval > 0:
+                    lista_extremos.append((valor_x, valor_fx))
+    return sorted(lista_extremos, key=lambda t: t[0])
 
 
-def genetic_algorithm(
-    coefficients: List[float],
-    lower: float,
-    upper: float,
-    optimize_max: bool,
-    bits: int,
-    pop_size: int,
-    generations: int,
+def algoritmo_genetico(
+    coeficientes: List[float],
+    limite_inferior: float,
+    limite_superior: float,
+    optimizar_max: bool,
+    cantidad_bits: int,
+    tamano_poblacion: int,
+    numero_generaciones: int,
 ) -> Tuple[List[float], List[float], Tuple[str, float, float], List[float]]:
-    """Ejecuta el algoritmo genético y devuelve la población final y los extremos.
+    """Ejecuta el algoritmo genético y devuelve resultados detallados."""
 
-    Devuelve una tupla que contiene:
-    - lista de valores de x decodificados de la población final,
-    - lista de valores de F(x) correspondientes,
-    - una tupla con (mejor_cromosoma, mejor_x, mejor_fx),
-    - historial del mejor valor de la función por generación para graficar.
-    """
-    population = initial_population(pop_size, bits)
-    # Inicializa la mejor solución con el primer individuo
-    best_chromosome = population[0]
-    best_x = decode(best_chromosome, lower, upper, bits)
-    best_fx = polynomial_value(best_x, coefficients)
-    # La historia guarda el mejor valor de cada generación para el gráfico de convergencia
-    history = [best_fx]
+    poblacion = generar_poblacion_inicial(tamano_poblacion, cantidad_bits)
 
-    for _ in range(generations):
-        # Decodifica y evalúa la población
-        # Decodifica los cromosomas en números reales y evalúa el polinomio
-        decoded = [decode(ch, lower, upper, bits) for ch in population]
-        values = [polynomial_value(x, coefficients) for x in decoded]
+    mejor_cromosoma = poblacion[0]
+    mejor_valor_x = decodificar_cromosoma(
+        mejor_cromosoma, limite_inferior, limite_superior, cantidad_bits
+    )
+    mejor_valor_fx = evaluar_polinomio(mejor_valor_x, coeficientes)
 
-        # Actualiza la mejor solución
-        for ch, x_val, fx in zip(population, decoded, values):
-            if (optimize_max and fx > best_fx) or (not optimize_max and fx < best_fx):
-                best_chromosome, best_x, best_fx = ch, x_val, fx
+    historial_mejores = [mejor_valor_fx]
 
-        history.append(best_fx)
+    for _ in range(numero_generaciones):
+        valores_x = [
+            decodificar_cromosoma(crom, limite_inferior, limite_superior, cantidad_bits)
+            for crom in poblacion
+        ]
+        valores_fx = [evaluar_polinomio(vx, coeficientes) for vx in valores_x]
 
-        # Calcula la aptitud y crea la siguiente generación
-        fitness = fitness_values(values, optimize_max)
-        next_generation = []
-        # Crea una nueva población completa
-        while len(next_generation) < pop_size:
-            # Selecciona padres proporcionalmente a su aptitud
-            parent1, parent2 = select(population, fitness)
-            # Aplica cruza y mutación para producir descendencia
-            child1, child2 = crossover(parent1, parent2)
-            child1 = mutate(child1)
-            child2 = mutate(child2)
-            next_generation.extend([child1, child2])
-        population = next_generation[:pop_size]
+        for crom, valor_x_temp, valor_fx_temp in zip(poblacion, valores_x, valores_fx):
+            if (optimizar_max and valor_fx_temp > mejor_valor_fx) or (
+                not optimizar_max and valor_fx_temp < mejor_valor_fx
+            ):
+                mejor_cromosoma = crom
+                mejor_valor_x = valor_x_temp
+                mejor_valor_fx = valor_fx_temp
 
-    final_decoded = [decode(ch, lower, upper, bits) for ch in population]
-    final_values = [polynomial_value(x, coefficients) for x in final_decoded]
-    return final_decoded, final_values, (best_chromosome, best_x, best_fx), history
+        historial_mejores.append(mejor_valor_fx)
+
+        aptitudes = calcular_aptitudes(valores_fx, optimizar_max)
+        siguiente_generacion = []
+        while len(siguiente_generacion) < tamano_poblacion:
+            padre1, padre2 = seleccionar_padres(poblacion, aptitudes)
+            hijo1, hijo2 = cruzar_cromosomas(padre1, padre2)
+            hijo1 = mutar_cromosoma(hijo1)
+            hijo2 = mutar_cromosoma(hijo2)
+            siguiente_generacion.extend([hijo1, hijo2])
+        poblacion = siguiente_generacion[:tamano_poblacion]
+
+    poblacion_decodificada = [
+        decodificar_cromosoma(crom, limite_inferior, limite_superior, cantidad_bits)
+        for crom in poblacion
+    ]
+    valores_finales = [evaluar_polinomio(vx, coeficientes) for vx in poblacion_decodificada]
+
+    return poblacion_decodificada, valores_finales, (
+        mejor_cromosoma,
+        mejor_valor_x,
+        mejor_valor_fx,
+    ), historial_mejores
 
 
-def main() -> None:
-    """Interfaz interactiva de línea de comandos para configurar y ejecutar el algoritmo."""
+def programa_principal() -> None:
+    """Interfaz de consola para configurar y ejecutar el algoritmo genético."""
+
     print("Optimización de polinomios mediante un Algoritmo Genético\n")
 
-    # Reúne los parámetros del usuario
-    degree = int(input("Grado del polinomio: "))
-    coeffs_input = input(
-        f"Coeficientes a0 .. a{degree} separados por espacios: "
+    grado_polinomio = int(input("Grado del polinomio: "))
+    entrada_coeficientes = input(
+        f"Coeficientes a0 .. a{grado_polinomio} separados por espacios: "
     )
-    coefficients = [float(c) for c in coeffs_input.split()]
-    if len(coefficients) != degree + 1:
-        raise ValueError("El número de coeficientes no coincide con el grado indicado")
+    coeficientes = [float(c) for c in entrada_coeficientes.split()]
+    if len(coeficientes) != grado_polinomio + 1:
+        raise ValueError(
+            "El número de coeficientes no coincide con el grado indicado"
+        )
 
-    flag = int(input("Bandera (0 = minimizar, 1 = maximizar): "))
-    optimize_max = flag == 1
+    bandera = int(input("Bandera (0 = minimizar, 1 = maximizar): "))
+    optimizar_max = bandera == 1
 
-    lower = float(input("Extremo inferior del intervalo de búsqueda (b): "))
-    upper = float(input("Extremo superior del intervalo de búsqueda (c): "))
-
-    bits = int(input("Número de bits por cromosoma: "))
-    pop_size = int(input("Tamaño de la población: "))
-    generations = int(input("Número máximo de generaciones: "))
-
-    # Ejecuta el algoritmo genético con los parámetros proporcionados
-    final_pop, final_vals, best, history = genetic_algorithm(
-        coefficients, lower, upper, optimize_max, bits, pop_size, generations
+    limite_inferior = float(
+        input("Extremo inferior del intervalo de búsqueda (b): ")
+    )
+    limite_superior = float(
+        input("Extremo superior del intervalo de búsqueda (c): ")
     )
 
-    # Muestra los resultados
-    best_chromosome, best_x, best_fx = best
+    cantidad_bits = int(input("Número de bits por cromosoma: "))
+    tamano_poblacion = int(input("Tamaño de la población: "))
+    numero_generaciones = int(input("Número máximo de generaciones: "))
+
+    poblacion_final, valores_finales, mejor_resultado, historial_mejores = algoritmo_genetico(
+        coeficientes,
+        limite_inferior,
+        limite_superior,
+        optimizar_max,
+        cantidad_bits,
+        tamano_poblacion,
+        numero_generaciones,
+    )
+
+    mejor_cromosoma, mejor_valor_x, mejor_valor_fx = mejor_resultado
+
     print("\nPoblación final (valores de x):")
-    for val in final_pop:
-        print(f"{val:.6f}")
+    for valor in poblacion_final:
+        print(f"{valor:.6f}")
 
     print("\nExtremos locales detectados:")
-    extrema = find_all_extrema(coefficients, lower, upper, optimize_max)
-    for x, fx in extrema:
-        print(f"x = {x:.6f}, F(x) = {fx:.6f}")
+    extremos = encontrar_extremos(
+        coeficientes, limite_inferior, limite_superior, optimizar_max
+    )
+    for valor_x, valor_fx in extremos:
+        print(f"x = {valor_x:.6f}, F(x) = {valor_fx:.6f}")
 
-    print("\nMejor cromosoma:", best_chromosome)
-    print(f"Mejor x = {best_x:.6f}")
-    print(f"F(x) = {best_fx:.6f}")
+    print("\nMejor cromosoma:", mejor_cromosoma)
+    print(f"Mejor x = {mejor_valor_x:.6f}")
+    print(f"F(x) = {mejor_valor_fx:.6f}")
 
-    # Grafica la convergencia y guarda la figura si matplotlib está disponible
     if plt is not None:
-        plt.plot(history)
+        plt.plot(historial_mejores)
         plt.title("Convergencia del algoritmo genético")
         plt.xlabel("Generación")
         plt.ylabel("Mejor F(x)")
@@ -231,4 +254,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    programa_principal()
+
