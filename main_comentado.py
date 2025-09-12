@@ -2,8 +2,7 @@
 # VERSIÓN GUIADA PARA ESTUDIO E IMPRESIÓN
 # ==============================================
 # Este archivo es el mismo que ``main.py`` pero con muchos comentarios
-# que explican cada paso. Se pensó para personas que están aprendiendo
-# programación, por lo que se intenta usar un lenguaje claro y amigable.
+# que explican cada paso.
 
 """Programa para optimizar polinomios mediante un algoritmo genético."""
 
