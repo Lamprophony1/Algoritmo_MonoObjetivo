@@ -113,36 +113,34 @@ def algoritmo_genetico(
     cantidad_bits: int,
     tamano_poblacion: int,
     numero_generaciones: int,
-) -> Tuple[List[float], List[float], Tuple[str, float, float], List[float]]:
+) -> Tuple[
+    List[float], List[float], List[Tuple[str, float, float]], List[float]
+]:
     """Ejecuta el algoritmo genético y devuelve resultados detallados."""
 
     poblacion = generar_poblacion_inicial(tamano_poblacion, cantidad_bits)
 
-    mejor_cromosoma = poblacion[0]
-    mejor_valor_x = decodificar_cromosoma(
-        mejor_cromosoma, limite_inferior, limite_superior, cantidad_bits
-    )
-    mejor_valor_fx = evaluar_polinomio(mejor_valor_x, coeficientes)
+    mejores: List[Tuple[str, float, float]] = []
 
-    historial_mejores = [mejor_valor_fx]
+    def actualizar_mejores(crom: str, valor_x: float, valor_fx: float) -> None:
+        mejores.append((crom, valor_x, valor_fx))
+        if optimizar_max:
+            mejores.sort(key=lambda t: t[2], reverse=True)
+        else:
+            mejores.sort(key=lambda t: t[2])
+        del mejores[2:]
+
+    valores_x = [
+        decodificar_cromosoma(crom, limite_inferior, limite_superior, cantidad_bits)
+        for crom in poblacion
+    ]
+    valores_fx = [evaluar_polinomio(vx, coeficientes) for vx in valores_x]
+    for crom, valor_x, valor_fx in zip(poblacion, valores_x, valores_fx):
+        actualizar_mejores(crom, valor_x, valor_fx)
+
+    historial_mejores = [mejores[0][2]]
 
     for _ in range(numero_generaciones):
-        valores_x = [
-            decodificar_cromosoma(crom, limite_inferior, limite_superior, cantidad_bits)
-            for crom in poblacion
-        ]
-        valores_fx = [evaluar_polinomio(vx, coeficientes) for vx in valores_x]
-
-        for crom, valor_x_temp, valor_fx_temp in zip(poblacion, valores_x, valores_fx):
-            if (optimizar_max and valor_fx_temp > mejor_valor_fx) or (
-                not optimizar_max and valor_fx_temp < mejor_valor_fx
-            ):
-                mejor_cromosoma = crom
-                mejor_valor_x = valor_x_temp
-                mejor_valor_fx = valor_fx_temp
-
-        historial_mejores.append(mejor_valor_fx)
-
         aptitudes = calcular_aptitudes(valores_fx, optimizar_max)
         siguiente_generacion = []
         while len(siguiente_generacion) < tamano_poblacion:
@@ -153,17 +151,19 @@ def algoritmo_genetico(
             siguiente_generacion.extend([hijo1, hijo2])
         poblacion = siguiente_generacion[:tamano_poblacion]
 
-    poblacion_decodificada = [
-        decodificar_cromosoma(crom, limite_inferior, limite_superior, cantidad_bits)
-        for crom in poblacion
-    ]
-    valores_finales = [evaluar_polinomio(vx, coeficientes) for vx in poblacion_decodificada]
+        valores_x = [
+            decodificar_cromosoma(crom, limite_inferior, limite_superior, cantidad_bits)
+            for crom in poblacion
+        ]
+        valores_fx = [evaluar_polinomio(vx, coeficientes) for vx in valores_x]
+        for crom, valor_x, valor_fx in zip(poblacion, valores_x, valores_fx):
+            actualizar_mejores(crom, valor_x, valor_fx)
+        historial_mejores.append(mejores[0][2])
 
-    return poblacion_decodificada, valores_finales, (
-        mejor_cromosoma,
-        mejor_valor_x,
-        mejor_valor_fx,
-    ), historial_mejores
+    poblacion_decodificada = valores_x
+    valores_finales = valores_fx
+
+    return poblacion_decodificada, valores_finales, mejores, historial_mejores
 
 
 def programa_principal() -> None:
@@ -195,7 +195,7 @@ def programa_principal() -> None:
     tamano_poblacion = int(input("Tamaño de la población: "))
     numero_generaciones = int(input("Número máximo de generaciones: "))
 
-    poblacion_final, valores_finales, mejor_resultado, historial_mejores = algoritmo_genetico(
+    poblacion_final, valores_finales, mejores_resultados, historial_mejores = algoritmo_genetico(
         coeficientes,
         limite_inferior,
         limite_superior,
@@ -204,16 +204,15 @@ def programa_principal() -> None:
         tamano_poblacion,
         numero_generaciones,
     )
-
-    mejor_cromosoma, mejor_valor_x, mejor_valor_fx = mejor_resultado
-
     print("\nPoblación final (valores de x):")
     for valor in poblacion_final:
         print(f"{valor:.6f}")
 
-    print("\nMejor cromosoma:", mejor_cromosoma)
-    print(f"Mejor x = {mejor_valor_x:.6f}")
-    print(f"F(x) = {mejor_valor_fx:.6f}")
+    for indice, (_, mejor_valor_x, mejor_valor_fx) in enumerate(
+        mejores_resultados, start=1
+    ):
+        print(f"\nMejor x {indice} = {mejor_valor_x:.6f}")
+        print(f"F(x) = {mejor_valor_fx:.6f}")
 
     if plt is not None:
         plt.plot(historial_mejores)
