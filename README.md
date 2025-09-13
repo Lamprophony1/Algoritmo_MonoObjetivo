@@ -40,7 +40,7 @@ Se solicitarán los siguientes datos de entrada:
 El programa mostrará:
 
 - La población final (valores de `x`).
-- El mejor cromosoma encontrado junto con su `x` y `F(x)` asociado.
+- Los **dos** mejores valores de `x` encontrados y sus respectivas evaluaciones `F(x)`.
 - Un archivo `convergence.png` con el gráfico de la evolución del mejor valor de `F(x)` por generación.
 
 ## Ejemplo
@@ -56,6 +56,15 @@ Extremo superior del intervalo de búsqueda (c): 10
 Número de bits por cromosoma: 32
 Tamaño de la población: 50
 Número máximo de generaciones: 100
+```
+
+La salida mostrará los dos mejores resultados, por ejemplo:
+
+```
+Mejor x 1 = 2.345678
+F(x) = 67.890123
+Mejor x 2 = 1.234567
+F(x) = 45.678901
 ```
 
 ## Polinomios de prueba sugeridos
