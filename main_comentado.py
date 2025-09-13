@@ -89,31 +89,44 @@ def seleccionar_padres(poblacion: List[str], aptitudes: List[float]) -> Tuple[st
     return tuple(random.choices(poblacion, weights=aptitudes, k=2))
 
 
-def cruzar_cromosomas(
-    padre1: str, padre2: str, probabilidad_cruza: float = 0.7
-) -> Tuple[str, str]:
-    """Mezcla la información de dos padres para producir dos hijos."""
+def cruzar_cromosomas(padre1: str, padre2: str) -> Tuple[str, str]:
+    """Mezcla la información de dos padres para producir dos hijos siempre nuevos."""
 
-    if random.random() < probabilidad_cruza:
-        # Elegimos al azar un punto de corte que no sea extremo
-        punto_cruza = random.randint(1, len(padre1) - 1)
-        hijo1 = padre1[:punto_cruza] + padre2[punto_cruza:]
-        hijo2 = padre2[:punto_cruza] + padre1[punto_cruza:]
-        return hijo1, hijo2
-    # Si no ocurre cruza, los hijos son copias de los padres
-    return padre1, padre2
+    # La longitud del cromosoma se usa para fijar los límites del punto de corte
+    longitud = len(padre1)
+    # Calculamos el 25 % y el 75 % de la longitud. El punto de cruza debe
+    # quedar en ese rango intermedio para que ambos padres aporten información.
+    limite_inferior = max(1, int(longitud * 0.25))
+    limite_superior = min(longitud - 1, int(longitud * 0.75))
+    # En cromosomas muy cortos, el 25 % y el 75 % pueden coincidir; lo ajustamos.
+    if limite_superior < limite_inferior:
+        limite_superior = limite_inferior
+    # Elegimos aleatoriamente el punto de cruza dentro de los límites calculados
+    punto_cruza = random.randint(limite_inferior, limite_superior)
+    # Construimos los hijos: la primera parte proviene de un padre y la segunda del otro
+    hijo1 = padre1[:punto_cruza] + padre2[punto_cruza:]
+    hijo2 = padre2[:punto_cruza] + padre1[punto_cruza:]
+    # Devolvemos las dos nuevas combinaciones genéticas
+    return hijo1, hijo2
 
 
-def mutar_cromosoma(cadena_bits: str, probabilidad_mutacion: float = 0.01) -> str:
-    """Realiza pequeñas modificaciones aleatorias (mutaciones) en un cromosoma."""
+def mutar_cromosoma(
+    cadena_bits: str, probabilidad_mutacion: float = 0.01, max_bits: int = 10
+) -> str:
+    """Realiza mutaciones en hasta ``max_bits`` posiciones elegidas al azar."""
 
-    nuevos_bits = [
-        "1" if (bit == "0" and random.random() < probabilidad_mutacion) else
-        "0" if (bit == "1" and random.random() < probabilidad_mutacion) else
-        bit
-        for bit in cadena_bits
-    ]
-    return "".join(nuevos_bits)
+    # Elegimos sin repetición las posiciones candidatas a mutar. Si el cromosoma
+    # tiene menos de 'max_bits' genes, tomamos todos los posibles.
+    indices = random.sample(range(len(cadena_bits)), k=min(max_bits, len(cadena_bits)))
+    # Convertimos la cadena a lista para poder modificar posiciones individuales
+    bits = list(cadena_bits)
+    for i in indices:
+        # Para cada índice seleccionado, decidimos si muta según 'probabilidad_mutacion'
+        if random.random() < probabilidad_mutacion:
+            # Invertimos el bit: 0 -> 1 o 1 -> 0
+            bits[i] = "1" if bits[i] == "0" else "0"
+    # Reconstruimos la cadena de bits mutada
+    return "".join(bits)
 
 
 

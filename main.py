@@ -73,29 +73,36 @@ def seleccionar_padres(poblacion: List[str], aptitudes: List[float]) -> Tuple[st
     return tuple(random.choices(poblacion, weights=aptitudes, k=2))
 
 
-def cruzar_cromosomas(
-    padre1: str, padre2: str, probabilidad_cruza: float = 0.7
-) -> Tuple[str, str]:
-    """Realiza una cruza de un punto entre dos padres."""
+def cruzar_cromosomas(padre1: str, padre2: str) -> Tuple[str, str]:
+    """Realiza una cruza de un punto entre dos padres siempre generando nuevos hijos.
 
-    if random.random() < probabilidad_cruza:
-        punto_cruza = random.randint(1, len(padre1) - 1)
-        hijo1 = padre1[:punto_cruza] + padre2[punto_cruza:]
-        hijo2 = padre2[:punto_cruza] + padre1[punto_cruza:]
-        return hijo1, hijo2
-    return padre1, padre2
+    El punto de corte se elige aleatoriamente entre el 25 % y el 75 % de la
+    longitud del cromosoma para garantizar que ambos fragmentos aporten
+    información de cada progenitor.
+    """
+
+    longitud = len(padre1)
+    limite_inferior = max(1, int(longitud * 0.25))
+    limite_superior = min(longitud - 1, int(longitud * 0.75))
+    if limite_superior < limite_inferior:
+        limite_superior = limite_inferior
+    punto_cruza = random.randint(limite_inferior, limite_superior)
+    hijo1 = padre1[:punto_cruza] + padre2[punto_cruza:]
+    hijo2 = padre2[:punto_cruza] + padre1[punto_cruza:]
+    return hijo1, hijo2
 
 
-def mutar_cromosoma(cadena_bits: str, probabilidad_mutacion: float = 0.01) -> str:
-    """Invierte bits del cromosoma con la probabilidad indicada."""
+def mutar_cromosoma(
+    cadena_bits: str, probabilidad_mutacion: float = 0.01, max_bits: int = 10
+) -> str:
+    """Invierte como máximo ``max_bits`` bits aleatorios del cromosoma."""
 
-    nuevos_bits = [
-        "1" if (bit == "0" and random.random() < probabilidad_mutacion) else
-        "0" if (bit == "1" and random.random() < probabilidad_mutacion) else
-        bit
-        for bit in cadena_bits
-    ]
-    return "".join(nuevos_bits)
+    indices = random.sample(range(len(cadena_bits)), k=min(max_bits, len(cadena_bits)))
+    bits = list(cadena_bits)
+    for i in indices:
+        if random.random() < probabilidad_mutacion:
+            bits[i] = "1" if bits[i] == "0" else "0"
+    return "".join(bits)
 
 
 def algoritmo_genetico(
